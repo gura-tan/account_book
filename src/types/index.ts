@@ -48,3 +48,31 @@ export interface Category {
 export type TxType = 'income' | 'expense' | 'transfer'
 export type BookType = 'shared' | 'personal'
 export type SharingType = 'none' | 'default' | 'full'
+export type CalcType = 'sum' | 'ratio'
+
+export interface MonthlyBudget {
+  id: string
+  user_id: string
+  year_month: string
+  expected_income: number
+  created_at: string
+}
+
+export interface PortfolioSetting {
+  id: string
+  user_id: string
+  category: string
+  sort_order: number
+  calc_type: CalcType
+  calc_value: number
+  min_amount: number | null
+  max_amount: number | null
+  created_at: string
+}
+
+export interface PortfolioAllocation {
+  category: string
+  value: number
+  isAdjustedMin?: boolean
+  isAdjustedMax?: boolean
+}

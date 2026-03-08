@@ -20,11 +20,11 @@ interface PortfolioState {
 }
 
 const defaultCategories = [
-  { category: '固定費', sort_order: 1, calc_type: 'ratio' as CalcType, calc_value: 0.20, min_amount: null, max_amount: null },
-  { category: '投資', sort_order: 2, calc_type: 'ratio' as CalcType, calc_value: 0.10, min_amount: null, max_amount: null },
-  { category: '消費', sort_order: 3, calc_type: 'ratio' as CalcType, calc_value: 0.40, min_amount: 50000, max_amount: null },
-  { category: '貯金', sort_order: 4, calc_type: 'ratio' as CalcType, calc_value: 0.15, min_amount: null, max_amount: null },
-  { category: 'パーソナル', sort_order: 5, calc_type: 'ratio' as CalcType, calc_value: 0.15, min_amount: null, max_amount: null },
+  { category: '固定費', sort_order: 1, calc_type: 'ratio' as CalcType, calc_value: 0.20, min_amount: null, max_amount: null, is_deducted: true },
+  { category: '投資', sort_order: 2, calc_type: 'ratio' as CalcType, calc_value: 0.10, min_amount: null, max_amount: null, is_deducted: true },
+  { category: '消費', sort_order: 3, calc_type: 'ratio' as CalcType, calc_value: 0.40, min_amount: 50000, max_amount: null, is_deducted: false },
+  { category: '貯金', sort_order: 4, calc_type: 'ratio' as CalcType, calc_value: 0.15, min_amount: null, max_amount: null, is_deducted: true },
+  { category: 'パーソナル', sort_order: 5, calc_type: 'ratio' as CalcType, calc_value: 0.15, min_amount: null, max_amount: null, is_deducted: false },
 ]
 
 export const usePortfolioStore = create<PortfolioState>((set, get) => ({
@@ -106,6 +106,57 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
 
     if (!error) {
       set({ monthlyBudget: newBudget as MonthlyBudget })
+      
+      // Auto-Income Generation Logic
+      // 1. Calculate how much to deduct from the income
+      const allocations = get().getAllocation()
+      const totalDeductions = allocations
+        .filter(a => a.isDeducted)
+        .reduce((sum, a) => sum + a.value, 0)
+        
+      const actualIncome = amount - totalDeductions
+      
+      // 2. Find target asset (first leaf asset)
+      const { data: leafAssets } = await supabase
+        .from('assets')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('asset_type', 'asset')
+        .limit(1)
+        
+      if (leafAssets && leafAssets.length > 0) {
+        const targetAssetId = leafAssets[0].id
+        const firstDayOfMonth = `${yearMonth}-01`
+        
+        // 3. Check if auto income transaction already exists for this month to avoid duplicates
+        const { data: existingTx } = await supabase
+          .from('transactions')
+          .select('id, amount')
+          .eq('user_id', user.id)
+          .eq('category', '給与') // The requested category for automatic income
+          .eq('tx_date', firstDayOfMonth)
+          .eq('tx_type', 'income')
+          .maybeSingle()
+          
+        if (existingTx) {
+          // Update existing automatic tx if amount changed
+          if (existingTx.amount !== actualIncome) {
+            await supabase.from('transactions').update({ amount: actualIncome }).eq('id', existingTx.id)
+          }
+        } else {
+          // Insert new automatic tx
+          await supabase.from('transactions').insert({
+            user_id: user.id,
+            book_type: 'shared',
+            tx_type: 'income',
+            amount: actualIncome,
+            asset_id: targetAssetId,
+            category: '給与',
+            description: '予想収入の自動記録',
+            tx_date: firstDayOfMonth
+          })
+        }
+      }
     }
     return { error: error || null }
   },
@@ -228,6 +279,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         value,
         isAdjustedMin,
         isAdjustedMax,
+        isDeducted: s.is_deducted,
       })
 
       distribution -= value

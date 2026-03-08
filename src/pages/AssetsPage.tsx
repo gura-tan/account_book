@@ -8,7 +8,11 @@ import { useAssetStore } from '../stores/assetStore'
 import { usePortfolioStore } from '../stores/portfolioStore'
 import type { Asset, AssetTreeNode } from '../types'
 
-export function AssetsPage() {
+interface AssetsPageProps {
+  onNavigate?: (id: string) => void
+}
+
+export function AssetsPage({ onNavigate }: AssetsPageProps) {
   const [activeTab, setActiveTab] = useState<'assets' | 'portfolio'>('assets')
   const { assets, loading: assetsLoading, fetchAssets } = useAssetStore()
   const { fetchData: fetchPortfolio, getAllocation } = usePortfolioStore()
@@ -99,7 +103,7 @@ export function AssetsPage() {
               <p className="text-sm">読み込み中...</p>
             </div>
           ) : (
-            <AssetTree onEdit={handleEdit} onAddChild={handleAddChild} />
+            <AssetTree onEdit={handleEdit} onAddChild={handleAddChild} onNavigate={onNavigate} />
           )}
 
           {/* Form Modal */}

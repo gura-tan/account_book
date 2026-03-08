@@ -67,6 +67,7 @@ export interface PortfolioSetting {
   calc_value: number
   min_amount: number | null
   max_amount: number | null
+  is_deducted: boolean
   created_at: string
 }
 
@@ -75,4 +76,5 @@ export interface PortfolioAllocation {
   value: number
   isAdjustedMin?: boolean
   isAdjustedMax?: boolean
+  isDeducted?: boolean
 }

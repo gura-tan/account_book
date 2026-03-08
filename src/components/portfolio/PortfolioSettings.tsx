@@ -28,7 +28,8 @@ export function PortfolioSettings() {
       calc_type: 'ratio',
       calc_value: 0.1,
       min_amount: null,
-      max_amount: null
+      max_amount: null,
+      is_deducted: false
     })
     setNewCat('')
     setShowAdd(false)
@@ -42,7 +43,7 @@ export function PortfolioSettings() {
     <div className="flex flex-col gap-6 animate-fade-in">
       {/* Expected Income */}
       <div className="card">
-        <h3 className="text-sm font-bold mb-3">今月の想定収入</h3>
+        <h3 className="text-sm font-bold mb-3">今月の予想収入</h3>
         <div className="flex gap-2">
           <input
             type="number"
@@ -188,6 +189,20 @@ function SettingItem({ setting, index }: { setting: PortfolioSetting, index: num
                 </div>
               </>
             )}
+            <div className="col-span-2 mt-1">
+              <label className="flex items-center gap-2 cursor-pointer w-fit pl-1">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-[var(--color-border)] text-[var(--color-accent)] focus:ring-[var(--color-accent)] bg-[var(--color-bg-input)] h-4 w-4"
+                  checked={setting.is_deducted}
+                  onChange={(e) => handleUpdate('is_deducted', e.target.checked)}
+                />
+                <span className="text-sm font-medium">予想収入から天引き</span>
+              </label>
+              <p className="text-xs text-[var(--color-text-muted)] mt-1 pl-6">
+                ※チェックを入れると、この額が毎月自動記録される予想収入額から差し引かれます
+              </p>
+            </div>
           </div>
           
           <div className="flex justify-end pt-2 border-t border-[var(--color-border)]">

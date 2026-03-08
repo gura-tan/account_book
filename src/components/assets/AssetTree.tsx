@@ -129,6 +129,7 @@ function AssetNode({ node, depth, onEdit, onAddChild }: AssetNodeProps) {
 interface AssetTreeProps {
   onEdit: (asset: AssetTreeNode) => void
   onAddChild: (parentId: string | null) => void
+  onNavigate?: (id: string) => void
 }
 
 export function AssetTree({ onEdit, onAddChild }: AssetTreeProps) {

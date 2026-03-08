@@ -4,6 +4,7 @@ import { AuthPage } from './pages/AuthPage'
 import { SharedBookPage } from './pages/SharedBookPage'
 import { PersonalBookPage } from './pages/PersonalBookPage'
 import { AssetsPage } from './pages/AssetsPage'
+import { AssetStatsPage } from './pages/AssetStatsPage'
 import { AppShell } from './components/layout/AppShell'
 
 function App() {
@@ -40,13 +41,18 @@ function App() {
   }
 
   const renderPage = () => {
+    if (activeTab.startsWith('assets/')) {
+      const assetId = activeTab.split('/')[1]
+      return <AssetStatsPage assetId={assetId} onBack={() => setActiveTab('assets')} />
+    }
+
     switch (activeTab) {
       case 'shared':
         return <SharedBookPage />
       case 'personal':
         return <PersonalBookPage />
       case 'assets':
-        return <AssetsPage />
+        return <AssetsPage onNavigate={(id: string) => setActiveTab(`assets/${id}`)} />
       default:
         return <SharedBookPage />
     }

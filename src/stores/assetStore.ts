@@ -74,8 +74,12 @@ export const useAssetStore = create<AssetState>((set, get) => ({
     const user = (await supabase.auth.getUser()).data.user
     if (!user) return { error: '認証されていません' }
 
+    const { useAuthStore } = await import('./authStore')
+    const groupId = useAuthStore.getState().activeGroupId
+
     const { error } = await supabase.from('assets').insert({
       user_id: user.id,
+      group_id: groupId,
       name,
       parent_id,
       asset_type,

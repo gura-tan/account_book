@@ -1,19 +1,111 @@
-import { PiggyBank } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus } from 'lucide-react'
+import { MonthNavigator } from '../components/layout/MonthNavigator'
+import { TransactionList } from '../components/transactions/TransactionList'
+import { TransactionForm } from '../components/transactions/TransactionForm'
+import { useTransactionStore } from '../stores/transactionStore'
 
 export function PersonalBookPage() {
+  const {
+    transactions,
+    loading,
+    currentYear,
+    currentMonth,
+    fetchTransactions,
+    nextMonth,
+    prevMonth,
+    getMonthlyIncome,
+    getMonthlyExpense,
+  } = useTransactionStore()
+  
+  const [showForm, setShowForm] = useState(false)
+
+  useEffect(() => {
+    fetchTransactions(currentYear, currentMonth, 'personal')
+  }, [currentYear, currentMonth])
+
+  const handlePrev = () => {
+    prevMonth()
+    const { currentYear: y, currentMonth: m } = useTransactionStore.getState()
+    fetchTransactions(y, m, 'personal')
+  }
+
+  const handleNext = () => {
+    nextMonth()
+    const { currentYear: y, currentMonth: m } = useTransactionStore.getState()
+    fetchTransactions(y, m, 'personal')
+  }
+
+  const income = getMonthlyIncome()
+  const expense = getMonthlyExpense()
+  const balance = income - expense
+
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 max-w-2xl mx-auto w-full">
-      <div className="w-16 h-16 rounded-2xl bg-[var(--color-bg-card)] border border-[var(--color-border)] flex items-center justify-center">
-        <PiggyBank size={28} className="text-[var(--color-accent)]" />
+    <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full">
+      {/* Month Navigator */}
+      <MonthNavigator
+        year={currentYear}
+        month={currentMonth}
+        onPrev={handlePrev}
+        onNext={handleNext}
+      />
+
+      {/* Summary Card */}
+      <div className="card">
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="text-xs text-[var(--color-text-muted)] mb-1">収入</p>
+            <p className="text-lg font-bold amount-income">
+              ¥{income.toLocaleString()}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--color-text-muted)] mb-1">支出</p>
+            <p className="text-lg font-bold amount-expense">
+              ¥{expense.toLocaleString()}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-[var(--color-text-muted)] mb-1">収支</p>
+            <p
+              className={`text-lg font-bold ${
+                balance >= 0 ? 'amount-income' : 'amount-expense'
+              }`}
+            >
+              {balance >= 0 ? '+' : ''}¥{balance.toLocaleString()}
+            </p>
+          </div>
+        </div>
       </div>
-      <h2 className="text-lg font-semibold">おこづかい帳</h2>
-      <p className="text-[var(--color-text-muted)] text-sm text-center max-w-xs">
-        おこづかいの記録は、フェーズ3で実装されます。<br />
-        ポートフォリオで割り当てた自由資金を個別に管理できるようになります。
-      </p>
-      <div className="badge bg-[var(--color-accent)]/15 text-[var(--color-accent)] mt-2">
-        フェーズ3で実装予定
-      </div>
+
+      {/* Transaction List */}
+      {loading ? (
+        <div className="empty-state">
+          <p className="text-sm">読み込み中...</p>
+        </div>
+      ) : (
+        <TransactionList transactions={transactions} bookType="personal" />
+      )}
+
+      {/* Add Button */}
+      <button
+        className="btn btn-primary fixed bottom-6 right-6 shadow-xl rounded-full px-5 py-3 text-base z-40"
+        onClick={() => setShowForm(true)}
+      >
+        <Plus size={20} />
+        記録する
+      </button>
+
+      {/* Transaction Form Modal */}
+      {showForm && (
+        <TransactionForm
+          bookType="personal"
+          onClose={() => {
+            setShowForm(false)
+            fetchTransactions(currentYear, currentMonth, 'personal')
+          }}
+        />
+      )}
     </div>
   )
 }

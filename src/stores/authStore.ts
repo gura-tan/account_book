@@ -5,6 +5,7 @@ import type { Session, User } from '@supabase/supabase-js'
 interface AuthState {
   session: Session | null
   user: User | null
+  activeGroupId: string | null
   loading: boolean
   initialized: boolean
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>
@@ -13,9 +14,12 @@ interface AuthState {
   initialize: () => void
 }
 
+let isInitializing = false
+
 export const useAuthStore = create<AuthState>((set) => ({
   session: null,
   user: null,
+  activeGroupId: null,
   loading: false,
   initialized: false,
 
@@ -32,12 +36,31 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: false })
       return { error: error.message }
     }
-    set({
-      session: data.session,
-      user: data.user,
-      loading: false,
-    })
-    return { error: null }
+    // Wait a brief moment for the Supabase trigger to create the group if signing up
+    if (!error && data.user) {
+      setTimeout(async () => {
+        const { data: memberData } = await supabase
+          .from('group_members')
+          .select('group_id')
+          .eq('user_id', data.user!.id)
+          .limit(1)
+          .single()
+        
+        set({
+          session: data.session,
+          user: data.user,
+          activeGroupId: memberData?.group_id || null,
+          loading: false,
+        })
+      }, 500)
+    } else {
+      set({
+        session: data.session,
+        user: data.user,
+        loading: false,
+      })
+    }
+    return { error: (error as any)?.message || null }
   },
 
   signIn: async (email, password) => {
@@ -50,26 +73,88 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ loading: false })
       return { error: error.message }
     }
-    set({
-      session: data.session,
-      user: data.user,
-      loading: false,
-    })
-    return { error: null }
+    if (!error && data.user) {
+      const { data: memberData } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', data.user.id)
+        .limit(1)
+        .single()
+        
+      set({
+        session: data.session,
+        user: data.user,
+        activeGroupId: memberData?.group_id || null,
+        loading: false,
+      })
+    } else {
+      set({
+        session: null,
+        user: null,
+        loading: false,
+      })
+    }
+    return { error: (error as any)?.message || null }
   },
 
   signOut: async () => {
     await supabase.auth.signOut()
-    set({ session: null, user: null })
+    set({ session: null, user: null, activeGroupId: null })
   },
 
   initialize: () => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      set({ session, user: session?.user ?? null, initialized: true })
+    if (isInitializing) return
+    isInitializing = true
+
+    // Fallback timer to prevent infinite loading if Supabase getSession hangs on a broken lock
+    const fallbackTimer = setTimeout(() => {
+      if (!useAuthStore.getState().initialized) {
+        console.warn('Supabase auth initialization timed out. Forcing initialized state to recover UI.')
+        set({ initialized: true })
+      }
+    }, 2000)
+
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      clearTimeout(fallbackTimer)
+      if (error) console.error('Auth Init Error:', error)
+      
+      let activeGroupId = null
+      if (session?.user) {
+        try {
+          const { data: memberData } = await supabase
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle()
+          activeGroupId = memberData?.group_id || null
+        } catch (e) {
+          console.error('Group fetch error:', e)
+        }
+      }
+      set({ session, user: session?.user ?? null, activeGroupId, initialized: true })
+    }).catch(err => {
+      clearTimeout(fallbackTimer)
+      console.error('Session promise error:', err)
+      set({ initialized: true })
     })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      set({ session, user: session?.user ?? null })
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      let activeGroupId = null
+      if (session?.user) {
+        try {
+          const { data: memberData } = await supabase
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', session.user.id)
+            .limit(1)
+            .maybeSingle()
+          activeGroupId = memberData?.group_id || null
+        } catch (e) {
+          console.error('Auth change group fetch error:', e)
+        }
+      }
+      set({ session, user: session?.user ?? null, activeGroupId })
     })
   },
 }))

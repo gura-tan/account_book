@@ -61,10 +61,17 @@ export const useTransactionStore = create<TransactionState>((set, get) => {
     createTransaction: async (data) => {
       const user = (await supabase.auth.getUser()).data.user
       if (!user) return { error: '認証されていません' }
+      
+      let groupId = null
+      if (data.book_type === 'shared') {
+        const { useAuthStore } = await import('./authStore')
+        groupId = useAuthStore.getState().activeGroupId
+      }
 
       // Insert transaction
       const { error: txError } = await supabase.from('transactions').insert({
         user_id: user.id,
+        group_id: groupId,
         ...data,
       })
       if (txError) return { error: txError.message }

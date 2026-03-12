@@ -40,22 +40,30 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
       return
     }
 
+    const { useAuthStore } = await import('./authStore')
+    const groupId = useAuthStore.getState().activeGroupId
+
     // Fetch Budget
-    const { data: budgetData } = await supabase
-      .from('monthly_budgets')
-      .select('*')
-      .eq('year_month', yearMonth)
-      .maybeSingle()
+    let budgetQuery = supabase.from('monthly_budgets').select('*').eq('year_month', yearMonth)
+    if (groupId) {
+      budgetQuery = budgetQuery.eq('group_id', groupId)
+    } else {
+      budgetQuery = budgetQuery.eq('user_id', user.id)
+    }
+    const { data: budgetData } = await budgetQuery.maybeSingle()
       
     // Fetch Settings
-    const { data: settingsData } = await supabase
-      .from('portfolio_settings')
-      .select('*')
-      .order('sort_order', { ascending: true })
+    let settingsQuery = supabase.from('portfolio_settings').select('*').order('sort_order', { ascending: true })
+    if (groupId) {
+      settingsQuery = settingsQuery.eq('group_id', groupId)
+    } else {
+      settingsQuery = settingsQuery.eq('user_id', user.id)
+    }
+    const { data: settingsData } = await settingsQuery
 
-    // If no settings exist for this user, initialize defaults (client-side initialization)
+    // If no settings exist for this group/user, initialize defaults
     if (!settingsData || settingsData.length === 0) {
-      const inserts = defaultCategories.map(cat => ({ ...cat, user_id: user.id }))
+      const inserts = defaultCategories.map(cat => ({ ...cat, user_id: user.id, group_id: groupId }))
       const { data: newSettings } = await supabase
         .from('portfolio_settings')
         .insert(inserts)
@@ -80,6 +88,8 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     const user = (await supabase.auth.getUser()).data.user
     if (!user) return { error: 'Not authenticated' }
 
+    const { useAuthStore } = await import('./authStore')
+    const groupId = useAuthStore.getState().activeGroupId
     const existingId = get().monthlyBudget?.id
 
     let error;
@@ -97,7 +107,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     } else {
       const { data, error: insertError } = await supabase
         .from('monthly_budgets')
-        .insert({ user_id: user.id, year_month: yearMonth, expected_income: amount })
+        .insert({ user_id: user.id, group_id: groupId, year_month: yearMonth, expected_income: amount })
         .select()
         .single()
       error = insertError?.message
@@ -116,27 +126,32 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
         
       const actualIncome = amount - totalDeductions
       
-      // 2. Find target asset (first leaf asset)
-      const { data: leafAssets } = await supabase
-        .from('assets')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('asset_type', 'asset')
-        .limit(1)
+      // 2. Find target asset (first leaf asset belonging to the group or user)
+      let assetQuery = supabase.from('assets').select('*').eq('asset_type', 'asset')
+      if (groupId) {
+        assetQuery = assetQuery.eq('group_id', groupId)
+      } else {
+        assetQuery = assetQuery.eq('user_id', user.id)
+      }
+      const { data: leafAssets } = await assetQuery.limit(1)
         
       if (leafAssets && leafAssets.length > 0) {
         const targetAssetId = leafAssets[0].id
         const firstDayOfMonth = `${yearMonth}-01`
         
         // 3. Check if auto income transaction already exists for this month to avoid duplicates
-        const { data: existingTx } = await supabase
-          .from('transactions')
-          .select('id, amount')
-          .eq('user_id', user.id)
+        let txQuery = supabase.from('transactions').select('id, amount')
           .eq('category', '給与') // The requested category for automatic income
           .eq('tx_date', firstDayOfMonth)
           .eq('tx_type', 'income')
-          .maybeSingle()
+          
+        if (groupId) {
+           txQuery = txQuery.eq('group_id', groupId)
+        } else {
+           txQuery = txQuery.eq('user_id', user.id)
+        }
+           
+        const { data: existingTx } = await txQuery.maybeSingle()
           
         if (existingTx) {
           // Update existing automatic tx if amount changed
@@ -147,6 +162,7 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
           // Insert new automatic tx
           await supabase.from('transactions').insert({
             user_id: user.id,
+            group_id: groupId,
             book_type: 'shared',
             tx_type: 'income',
             amount: actualIncome,
@@ -180,9 +196,12 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     const user = (await supabase.auth.getUser()).data.user
     if (!user) return { error: 'Not authenticated' }
 
+    const { useAuthStore } = await import('./authStore')
+    const groupId = useAuthStore.getState().activeGroupId
+
     const { data, error } = await supabase
       .from('portfolio_settings')
-      .insert({ ...setting, user_id: user.id })
+      .insert({ ...setting, user_id: user.id, group_id: groupId })
       .select()
       .single()
 

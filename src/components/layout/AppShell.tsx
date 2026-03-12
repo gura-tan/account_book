@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
-import { BookOpen, Wallet, PiggyBank, LogOut, HelpCircle } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { BookOpen, Wallet, PiggyBank, LogOut, HelpCircle, Settings } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
+import { GroupSettingsModal } from '../settings/GroupSettingsModal'
 
 interface AppShellProps {
   children: ReactNode
@@ -16,6 +17,7 @@ const tabs = [
 
 export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
   const { signOut } = useAuthStore()
+  const [showSettings, setShowSettings] = useState(false)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,6 +28,13 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
           <span className="font-semibold text-sm">家計簿</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            className="btn btn-ghost btn-icon"
+            title="家族設定"
+            onClick={() => setShowSettings(true)}
+          >
+            <Settings size={18} />
+          </button>
           <button className="btn btn-ghost btn-icon" title="チュートリアル">
             <HelpCircle size={18} />
           </button>
@@ -57,6 +66,9 @@ export function AppShell({ children, activeTab, onTabChange }: AppShellProps) {
 
       {/* Main Content */}
       <main className="flex-1 p-4 animate-fade-in">{children}</main>
+
+      {/* Settings Modal */}
+      {showSettings && <GroupSettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
